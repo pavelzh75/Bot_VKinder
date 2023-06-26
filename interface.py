@@ -1,102 +1,95 @@
 import vk_api
-from config import acces_token
-from vk_api.exceptions import ApiError
-from datetime import datetime
-from pprint import pprint
-
+from vk_api.longpoll import VkLongPoll, VkEventType
+from vk_api.utils import get_random_id
+from core import VkTools
+from config import *
 from data_store import *
 
-from operator import itemgetter
+vk = vk_api.VkApi(token=comunity_token)
 
-class VkTools:
-    def __init__(self, acces_token):
-        self.vkapi = vk_api.VkApi(token=acces_token)
+# send message
+class BotInterface():
+    def __init__(self, comunity_token, acces_token):
+        self.vk = vk_api.VkApi(token=comunity_token)
+        self.longpoll = VkLongPoll(self.vk)
+        self.vk_tools = VkTools(acces_token)
+        self.params = {}
+        self.worksheets = []
+        self.offset = 0
 
-    def _bdate_toyear(self, bdate):
-        user_year = bdate.split('.')[2] #if bdate else None
-        now = datetime.now().year
-        return now - int(user_year) #if bdate else None
 
+    def message_send(self, user_id, message, attachment=None):
+        self.vk.method('messages.send',
+                  {'user_id': user_id,
+                   'message': message,
+                   'attachment': attachment,
+                   'random_id': get_random_id()}
+                   )
 
-    def get_profile_info(self, user_id):
-        try:
-            info, = self.vkapi.method('users.get',
-                                      {'user_id': user_id,
-                                       'fields': 'city, sex, relation, bdate'
-                                      }
-                                     )
-        except ApiError as e:
-            info = {}
-            print(f'error = {e}')
+    ''' photo{owner_id}_{id}'''
+    def worksheet_photos(self, worksheet):
+        photos = self.vk_tools.get_photos(worksheet['id'])
+        photo_string = ''
+        for photo in photos:
+            photo_string += f'photo{photo["owner_id"]}_{photo["id"]},'
+        return photo_string
 
-        result = {'name': (info['first_name'] + ' ' + info['last_name'])
-                  if 'first_name' in info and 'last_name' in info else None,
-                  'sex': info.get('sex') if 'sex' in info else None,
-                  'city': info.get('city')['title'] if info.get('city') is not None else None,
-                  'bdate': info['bdate'] if 'bdate' in info else None,
-                  'year': self._bdate_toyear(info.get('bdate'))
+# event handling
+    def event_hendler(self):
+        for event in self.longpoll.listen():
+            if event.type == VkEventType.MESSAGE_NEW and event.to_me:
+                if event.text.lower() == 'привет':
+                    '''логика получения данных о пользователе'''
+                    self.params = self.vk_tools.get_profile_info(event.user_id)
+                    print(self.params)
 
-        }
+                    # for key, value in self.params.items():
+                    #     if value is None:
+                    #         self.message_send(
+                    #             event.user_id, f'Привет, {self.params["name"]}')
 
-        return result   #если в result есть None нужно обработать, например не заполнен день рождения
+                    self.message_send(
+                        event.user_id, f'Привет, {self.params["name"]}')
+                elif event.text.lower() == 'поиск':
+                    '''логика для поиска анкет'''
+                    self.message_send(
+                        event.user_id, 'Начинаем поиск')
+                    flag = False
+                    while flag == False:
+                        if self.worksheets:
+                            worksheet = self.worksheets.pop()
+                            photo_string = self.worksheet_photos(worksheet)
+                        else:
+                            self.worksheets = self.vk_tools.search_worksheet(
+                                self.params, self.offset)
+                            worksheet = self.worksheets.pop()
+                            photo_string = self.worksheet_photos(worksheet)
 
-    def search_worksheet(self, params, offset):
-        try:
-            users = self.vkapi.method('users.search',
-                                      {'count': 50,
-                                       'offset': offset,
-                                       'hometown': params['city'],
-                                       'sex': 1 if params['sex'] == 2 else 2,
-                                       'has_photo': True,
-                                       'age_from': params['year'] - 3,
-                                       'age_to': params['year'] + 3
-                                      }
-                                     )
-        except ApiError as e:
-            users = []
-            print(f'error = {e}')
+                        '''проверка анкеты в бд в соответствие с event.user_id'''
+                        result = check_user((db_url_object), event.user_id, worksheet['id'])
 
-        result = [{
-            'name': item['first_name'] + ' ' +item['last_name'],
-            'id': item['id']
-                    } for item in users['items'] if item['is_closed'] is False
-                    ]
+                        if result == False:
+                            flag = True
 
-        return result
+                        if not self.worksheets:
+                            self.offset += 10
 
-    def get_photos(self, id):
-        try:
-            photos = self.vkapi.method('photos.get',
-                                      {'owner_id': id,
-                                       'album_id': 'profile',
-                                       'extended': 1
-                                      }
-                                     )
-        except ApiError as e:
-            photos = {}
-            print(f'error = {e}')
+                    self.message_send(
+                        event.user_id,
+                        f'имя: {worksheet["name"]} ссылка: vk.com/{worksheet["id"]}',
+                        attachment=photo_string
+                        )
 
-        result = [{'owner_id': item['owner_id'],
-                   'id': item['id'],
-                   'likes': item['likes']['count'],
-                   'comments': item['comments']['count']
-                   } for item in photos['items']
-                  ]
+                    '''добавить анкету в бд в соответствие с event.user_id'''
+                    add_user((db_url_object), event.user_id, worksheet['id'])
 
-        '''сортировка по лайкам и коментам'''
-        for i in range(len(result)):
-            result = sorted(result, key=itemgetter('likes', 'comments'), reverse=True)
-
-        return result[:3]
-
+                elif event.text.lower() == 'пока':
+                    self.message_send(event.user_id, 'До новых встреч')
+                else:
+                    self.message_send(event.user_id, 'Неизвестная команда')
 
 
 
 if __name__ == '__main__':
-    user_id = '588055212'
-    tools = VkTools(acces_token)
-    params = tools.get_profile_info(user_id)
-    worksheets = tools.search_worksheet(params, 20)
-    worksheet = worksheets.pop()
-    photos = tools.get_photos(worksheet['id'])
-    pprint(worksheets)
+    bot_interface = BotInterface(comunity_token, acces_token)
+    bot_interface.event_hendler()
