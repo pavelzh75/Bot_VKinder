@@ -41,15 +41,14 @@ class BotInterface():
                 if event.text.lower() == 'привет':
                     '''логика получения данных о пользователе'''
                     self.params = self.vk_tools.get_profile_info(event.user_id)
-                    print(self.params)
-
-                    # for key, value in self.params.items():
-                    #     if value is None:
-                    #         self.message_send(
-                    #             event.user_id, f'Привет, {self.params["name"]}')
-
                     self.message_send(
-                        event.user_id, f'Привет, {self.params["name"]}')
+                        event.user_id,
+                        f'Привет, {self.params["name"]}!\n'
+                        f'Вас приветствует бот VKinder!\n'
+                        f'Бот осуществляет поиск подходящей по критериям пары.\n'
+                        f'Чтобы начать/продолжить поиск введите команду "поиск".\n'
+                        f'Для завершения работы команду "пока".\n'
+                        )
                 elif event.text.lower() == 'поиск':
                     '''логика для поиска анкет'''
                     self.message_send(
@@ -66,7 +65,7 @@ class BotInterface():
                             photo_string = self.worksheet_photos(worksheet)
 
                         '''проверка анкеты в бд в соответствие с event.user_id'''
-                        result = check_user((db_url_object), event.user_id, worksheet['id'])
+                        result = check_user(engine, event.user_id, worksheet['id'])
 
                         if result == False:
                             flag = True
@@ -81,7 +80,7 @@ class BotInterface():
                         )
 
                     '''добавить анкету в бд в соответствие с event.user_id'''
-                    add_user((db_url_object), event.user_id, worksheet['id'])
+                    add_user(engine, event.user_id, worksheet['id'])
 
                 elif event.text.lower() == 'пока':
                     self.message_send(event.user_id, 'До новых встреч')
