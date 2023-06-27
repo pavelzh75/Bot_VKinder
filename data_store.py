@@ -7,7 +7,8 @@ from config import db_url_object
 
 metadata = MetaData()
 Base = declarative_base()
-
+engine = create_engine(db_url_object)
+Base.metadata.create_all(engine)
 
 class Viewed(Base):
     __tablename__ = 'viewed'
@@ -19,17 +20,17 @@ class Viewed(Base):
 
 # добавление записи в бд
 def add_user(db_url_object, profile_id, worksheet_id):
-    engine = create_engine(db_url_object)
-    Base.metadata.create_all(engine)
+    # engine = create_engine(db_url_object)
+    # Base.metadata.create_all(engine)
     with Session(engine) as session:
         to_bd = Viewed(profile_id=profile_id, worksheet_id=worksheet_id)
         session.add(to_bd)
         session.commit()
 
 # извлечение записей из бд
-def check_user(db_url_object, profile_id, worksheet_id):
-    engine = create_engine(db_url_object)
-    Base.metadata.create_all(engine)
+def check_user(engine, profile_id, worksheet_id):
+    # engine = create_engine(db_url_object)
+    # Base.metadata.create_all(engine)
     with Session(engine) as session:
         from_bd = session.query(Viewed).filter(
             Viewed.profile_id == profile_id,
