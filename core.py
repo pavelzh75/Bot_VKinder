@@ -3,8 +3,7 @@ from config import acces_token
 from vk_api.exceptions import ApiError
 from datetime import datetime
 from pprint import pprint
-
-from data_store import *
+from random import randint
 
 from operator import itemgetter
 
@@ -13,9 +12,13 @@ class VkTools:
         self.vkapi = vk_api.VkApi(token=acces_token)
 
     def _bdate_toyear(self, bdate):
-        user_year = bdate.split('.')[2] #if bdate else None
-        now = datetime.now().year
-        return now - int(user_year) #if bdate else None
+        if bdate != None:
+            user_year = bdate.split('.')[2]
+            now = datetime.now().year
+            age = now - int(user_year)
+        else:
+            age = randint(30, 60)
+        return age
 
 
     def get_profile_info(self, user_id):
@@ -29,7 +32,7 @@ class VkTools:
             info = {}
             print(f'error = {e}')
 
-        result = {'name': (info['first_name'] + ' ' + info['last_name'])
+        result = {'name': (info['first_name']) #+ ' ' + info['last_name']
                   if 'first_name' in info and 'last_name' in info else None,
                   'sex': info.get('sex') if 'sex' in info else None,
                   'city': info.get('city')['title'] if info.get('city') is not None else None,
@@ -38,7 +41,7 @@ class VkTools:
 
         }
 
-        return result   #если в result есть None нужно обработать, например не заполнен день рождения
+        return result
 
     def search_worksheet(self, params, offset):
         try:
@@ -99,4 +102,4 @@ if __name__ == '__main__':
     worksheets = tools.search_worksheet(params, 20)
     worksheet = worksheets.pop()
     photos = tools.get_photos(worksheet['id'])
-    pprint(worksheets)
+    pprint(params)
