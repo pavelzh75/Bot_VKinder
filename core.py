@@ -17,7 +17,7 @@ class VkTools:
             now = datetime.now().year
             age = now - int(user_year)
         else:
-            age = randint(30, 60)
+            age = None
         return age
 
 
