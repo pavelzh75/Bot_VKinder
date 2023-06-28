@@ -41,7 +41,7 @@ class BotInterface():
                  'sex': 'Пол',
                  'city': 'Город',
                  'bdate': 'Дата рождения',
-                 'year': 'Дата рождения'
+                 'year': 'Возраст'
                  }
         for k, v in param.items():
             if k == key:
@@ -69,41 +69,50 @@ class BotInterface():
                             f'Бот осуществляет поиск подходящей по критериям пары.\n'
                             f'Чтобы начать/продолжить поиск введите команду "поиск".\n'
                             f'Для завершения работы команду "пока".\n'
-                            ) 
+                        )
 
                     else:
-                            self.message_send(
+                        self.message_send(
                             event.user_id,
                             f'Привет, {self.params["name"]}!\n'
                             f'Вас приветствует бот VKinder!\n'
                             f'В вашем профиле не заполнено: {self.check_result}.\n'
                             f'Чтобы продолжить работу отредактируйте данные профиля"\n'
                             f'и наберите команду "привет".\n'
-                            )
+                        )
 
                 elif event.text.lower() == 'поиск' and not self.check_result:
                     '''логика для поиска анкет'''
                     self.message_send(
                         event.user_id, 'Начинаем поиск')
                     flag = False
-                    while flag == False:
-                        if self.worksheets:
-                            worksheet = self.worksheets.pop()
-                            photo_string = self.worksheet_photos(worksheet)
-                        else:
-                            self.worksheets = self.vk_tools.search_worksheet(
-                                self.params, self.offset)
-                            worksheet = self.worksheets.pop()
-                            photo_string = self.worksheet_photos(worksheet)
+                    try:
+                        while flag == False:
+                            if self.worksheets:
+                                worksheet = self.worksheets.pop()
+                                photo_string = self.worksheet_photos(worksheet)
+                            else:
+                                try:
+                                    self.worksheets = self.vk_tools.search_worksheet(
+                                        self.params, self.offset)
+                                    worksheet = self.worksheets.pop()
+                                    photo_string = self.worksheet_photos(worksheet)
+                                except AttributeError as e:
+                                    print(f'error = {e}')
 
-                        '''проверка анкеты в бд в соответствие с event.user_id'''
-                        result = check_user(engine, event.user_id, worksheet['id'])
+                            try:
+                                '''проверка анкеты в бд в соответствие с event.user_id'''
+                                result = check_user(engine, event.user_id, worksheet['id'])
+                            except UnboundLocalError as e:
+                                print(f'error = {e}')
 
-                        if result == False:
-                            flag = True
+                            if result == False:
+                                flag = True
 
-                        if not self.worksheets:
-                            self.offset += 10
+                            if not self.worksheets:
+                                self.offset += 100
+                    except TypeError as e:
+                        print(f'error = {e}')
 
                     self.message_send(
                         event.user_id,
@@ -116,6 +125,10 @@ class BotInterface():
 
                 elif event.text.lower() == 'пока':
                     self.message_send(event.user_id, 'До новых встреч')
+
+                elif event.text.lower() == 'поиск' and self.check_result:
+                    self.message_send(event.user_id, 'Пожалуйста, заполните профиль.')
+
                 else:
                     self.message_send(event.user_id, 'Неизвестная команда')
 
