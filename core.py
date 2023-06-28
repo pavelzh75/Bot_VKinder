@@ -3,7 +3,7 @@ from config import acces_token
 from vk_api.exceptions import ApiError
 from datetime import datetime
 from pprint import pprint
-from random import randint
+
 
 from operator import itemgetter
 
@@ -38,8 +38,7 @@ class VkTools:
                   'city': info.get('city')['title'] if info.get('city') is not None else None,
                   'bdate': info['bdate'] if 'bdate' in info else None,
                   'year': self._bdate_toyear(info.get('bdate'))
-
-        }
+                  }
 
         return result
 
@@ -55,17 +54,21 @@ class VkTools:
                                        'age_to': params['year'] + 3
                                       }
                                      )
-        except ApiError as e:
+        except (ApiError, TypeError) as e:
             users = []
             print(f'error = {e}')
 
-        result = [{
-            'name': item['first_name'] + ' ' +item['last_name'],
-            'id': item['id']
-                    } for item in users['items'] if item['is_closed'] is False
-                    ]
+        try:
+            result = [{
+                'name': item['first_name'] + ' ' +item['last_name'],
+                'id': item['id']
+                        } for item in users['items'] if item['is_closed'] is False
+                        ]
 
-        return result
+            return result
+        except TypeError as e:
+            result = []
+            print(f'error = {e}')
 
     def get_photos(self, id):
         try:
