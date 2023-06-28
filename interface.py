@@ -16,6 +16,7 @@ class BotInterface():
         self.params = {}
         self.worksheets = []
         self.offset = 0
+        self.check_result = []
 
 
     def message_send(self, user_id, message, attachment=None):
@@ -34,6 +35,19 @@ class BotInterface():
             photo_string += f'photo{photo["owner_id"]}_{photo["id"]},'
         return photo_string
 
+    def black_list(self, key):
+        result = {}
+        param = {'name': 'ФИО',
+                 'sex': 'Пол',
+                 'city': 'Город',
+                 'bdate': 'Дата рождения',
+                 'year': 'Дата рождения'
+                 }
+        for k, v in param.items():
+            if k == key:
+                result[key] = param[k]
+        return result
+
 # event handling
     def event_hendler(self):
         for event in self.longpoll.listen():
@@ -41,15 +55,33 @@ class BotInterface():
                 if event.text.lower() == 'привет':
                     '''логика получения данных о пользователе'''
                     self.params = self.vk_tools.get_profile_info(event.user_id)
-                    self.message_send(
-                        event.user_id,
-                        f'Привет, {self.params["name"]}!\n'
-                        f'Вас приветствует бот VKinder!\n'
-                        f'Бот осуществляет поиск подходящей по критериям пары.\n'
-                        f'Чтобы начать/продолжить поиск введите команду "поиск".\n'
-                        f'Для завершения работы команду "пока".\n'
-                        )
-                elif event.text.lower() == 'поиск':
+
+                    for k, v in self.params.items():
+                        if v is None:
+                            result = (self.black_list(k)[k])
+                            self.check_result.append(result)
+
+                    if not self.check_result:
+                        self.message_send(
+                            event.user_id,
+                            f'Привет, {self.params["name"]}!\n'
+                            f'Вас приветствует бот VKinder!\n'
+                            f'Бот осуществляет поиск подходящей по критериям пары.\n'
+                            f'Чтобы начать/продолжить поиск введите команду "поиск".\n'
+                            f'Для завершения работы команду "пока".\n'
+                            ) 
+
+                    else:
+                            self.message_send(
+                            event.user_id,
+                            f'Привет, {self.params["name"]}!\n'
+                            f'Вас приветствует бот VKinder!\n'
+                            f'В вашем профиле не заполнено: {self.check_result}.\n'
+                            f'Чтобы продолжить работу отредактируйте данные профиля"\n'
+                            f'и наберите команду "привет".\n'
+                            )
+
+                elif event.text.lower() == 'поиск' and not self.check_result:
                     '''логика для поиска анкет'''
                     self.message_send(
                         event.user_id, 'Начинаем поиск')
