@@ -39,7 +39,6 @@ class VkTools:
                   'bdate': info['bdate'] if 'bdate' in info else None,
                   'year': self._bdate_toyear(info.get('bdate'))
                   }
-
         return result
 
     def search_worksheet(self, params, offset):
