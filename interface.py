@@ -16,8 +16,6 @@ class BotInterface():
         self.params = {}
         self.worksheets = []
         self.offset = 0
-        self.check_result = []
-
 
     def message_send(self, user_id, message, attachment=None):
         self.vk.method('messages.send',
@@ -35,56 +33,50 @@ class BotInterface():
             photo_string += f'photo{photo["owner_id"]}_{photo["id"]},'
         return photo_string
 
-    def black_list(self, key):
-        result = {}
-        param = {'name': 'ФИО',
-                 'sex': 'Пол',
-                 'city': 'Город',
-                 'bdate': 'Дата рождения',
-                 'year': 'Возраст'
-                 }
-        for k, v in param.items():
-            if k == key:
-                result[key] = param[k]
-        return result
+    def city_input(self, user_id):
+        self.message_send(user_id, 'Введите город:')
+        for event in self.longpoll.listen():
+            if event.type == VkEventType.MESSAGE_NEW and event.to_me:
+                text = event.text
+                return text
+
+    def year_input(self, user_id):
+        self.message_send(user_id, 'Введите возраст:')
+        for event in self.longpoll.listen():
+            if event.type == VkEventType.MESSAGE_NEW and event.to_me:
+                age = event.text
+                if age.isdigit() == True:
+                    age = int(age)
+                    return age
 
 # event handling
     def event_hendler(self):
         for event in self.longpoll.listen():
             if event.type == VkEventType.MESSAGE_NEW and event.to_me:
                 if event.text.lower() == 'привет':
+
                     '''логика получения данных о пользователе'''
                     self.params = self.vk_tools.get_profile_info(event.user_id)
+                    self.message_send(event.user_id,
+                                     f'Привет, {self.params["name"]}!\n'
+                                     f'Вас приветствует бот VKinder!\n'
+                                     f'Бот осуществляет поиск подходящей по критериям пары.\n'
+                                     f'Чтобы начать/продолжить поиск введите команду "поиск".\n'
+                                     f'Для завершения работы команду "пока".\n'
+                                     )
 
-                    for k, v in self.params.items():
-                        if v is None:
-                            result = (self.black_list(k)[k])
-                            self.check_result.append(result)
+                elif event.text.lower() == 'поиск':
 
-                    if not self.check_result:
-                        self.message_send(
-                            event.user_id,
-                            f'Привет, {self.params["name"]}!\n'
-                            f'Вас приветствует бот VKinder!\n'
-                            f'Бот осуществляет поиск подходящей по критериям пары.\n'
-                            f'Чтобы начать/продолжить поиск введите команду "поиск".\n'
-                            f'Для завершения работы команду "пока".\n'
-                        )
+                    if self.params['city'] is None:
+                        self.params['city'] = self.city_input(event.user_id)
 
-                    else:
-                        self.message_send(
-                            event.user_id,
-                            f'Привет, {self.params["name"]}!\n'
-                            f'Вас приветствует бот VKinder!\n'
-                            f'В вашем профиле не заполнено: {self.check_result}.\n'
-                            f'Чтобы продолжить работу отредактируйте данные профиля"\n'
-                            f'и наберите команду "привет".\n'
-                        )
+                    if self.params['year'] is None:
+                        self.params['year'] = self.year_input(event.user_id)
 
-                elif event.text.lower() == 'поиск' and not self.check_result:
                     '''логика для поиска анкет'''
                     self.message_send(
                         event.user_id, 'Начинаем поиск')
+
                     flag = False
                     try:
                         while flag == False:
@@ -99,7 +91,6 @@ class BotInterface():
                                     photo_string = self.worksheet_photos(worksheet)
                                 except AttributeError as e:
                                     print(f'error = {e}')
-
                             try:
                                 '''проверка анкеты в бд в соответствие с event.user_id'''
                                 result = check_user(engine, event.user_id, worksheet['id'])
@@ -125,9 +116,6 @@ class BotInterface():
 
                 elif event.text.lower() == 'пока':
                     self.message_send(event.user_id, 'До новых встреч')
-
-                elif event.text.lower() == 'поиск' and self.check_result:
-                    self.message_send(event.user_id, 'Пожалуйста, заполните профиль.')
 
                 else:
                     self.message_send(event.user_id, 'Неизвестная команда')
